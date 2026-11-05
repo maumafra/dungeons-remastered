@@ -1,20 +1,26 @@
+Player = require("src.player")
+Enemy = require("src.enemy")
+
 local Game = {}
 
-SWORD_TEST = 0
+-- entities
+CAMERA_ENT = 0
 
-CHARACTER_ENT = 0
-DEFAULT_SPEED = 250.0
-DIAGONAL_SPEED = 177.0
-CHARACTER_MOVE_ANIMATION_INTERVAL = 0.2
-CHARACTER_IDLE_ANIMATION_INTERVAL = 0.6
+-- map
+MAP_BOUNDS = {x = 0, y = 0}
 
 ANIMATION_ACTION = {
+    FREE = -1,
     UP = 0,
     DOWN = 1,
     RIGHT = 2,
     LEFT = 3,
-    ATTACK = 4,
-    IDLE = 5
+    IDLE = 4,
+    ATTACK = 5,
+    ATTACK_UP = 6,
+    ATTACK_DOWN = 7,
+    ATTACK_LEFT = 8,
+    ATTACK_RIGHT = 9,
 }
 
 function TableLength(T)
@@ -23,234 +29,74 @@ function TableLength(T)
   return count
 end
 
-function Game:setup()
-    Game:loadCharacter()
+function Game:setup(mapBoundX, mapBoundY)
+    Player:loadCharacter()
+    Game:loadCamera()
+    Enemy:loadEnemies()
+    MAP_BOUNDS.x = mapBoundX
+    MAP_BOUNDS.y = mapBoundY
 end
 
 function Game:update(dt)
-    Game:updateCharacter(dt)
-
-    local testRotation, testPosition, testSprite = nebula.ecs.getComponent(SWORD_TEST, Rotation, Position, Sprite)
-    local dx = nebula.mouse.getX() - (testPosition.x + testSprite.texture.width * 2)
-    local dy = nebula.mouse.getY() - (testPosition.y + testSprite.texture.height * 2)
-    --print(math.atan(dy, dx))
-
-    if dy < 0 then dy = - dy end
-
-    local v = ((math.atan(dy, dx) * (180 / 3.14159)))
-    if v < 0 then v = -v end
-    testRotation.value = v
+    Player:updateCharacter(dt)
+    Game:updateCamera()
+    Enemy:update(dt)
 
     for _, e in pairs(nebula.ecs.getEntitiesWith(Position, Speed)) do
         local eSpeed, ePos = nebula.ecs.getComponent(e, Speed, Position)
         ePos.x = ePos.x + (eSpeed.x * dt)
         ePos.y = ePos.y + (eSpeed.y * dt)
+
         if (e == CHARACTER_ENT) then
-            local collides = false
+            Player:checkCharacterColision(ePos, eSpeed, dt)
+        end
 
-            for _, ce in pairs(nebula.ecs.getEntitiesWith(CollisionBox)) do
-                if ce ~= CHARACTER_ENT then
-                    collides = collides or nebula.physics.checkCollision(CHARACTER_ENT, ce)
-                end
-            end
-
-            if collides then
-                ePos.x = ePos.x - (eSpeed.x * dt)
-                ePos.y = ePos.y - (eSpeed.y * dt)
-            else
-                nebula.graphics.moveCamera(eSpeed.x * dt, 0)
-                local fpsPos = nebula.ecs.getComponent(FPS_ENT, Position)
-                fpsPos.x = fpsPos.x + eSpeed.x * dt
-            end
+        if (e == CAMERA_ENT) then
+            nebula.graphics.pointCameraTo(ePos.x + WINDOW_WIDTH/2, ePos.y + WINDOW_HEIGHT/2)
         end
     end
 end
 
 function Game:draw()
-    nebula.graphics.draw(CHARACTER_ENT)
-    nebula.graphics.draw(SWORD_TEST)
+    Enemy:draw()
+    Player:draw()
 end
 
-function Game:loadCharacter()
-    local texCUp01 = nebula.graphics.newTexture("resources/character/charUp01.png")
-    local texCUp02 = nebula.graphics.newTexture("resources/character/charUp02.png")
-    local texCIdle01 = nebula.graphics.newTexture("resources/character/charIdle01.png")
-    local texCIdle02 = nebula.graphics.newTexture("resources/character/charIdle02.png")
-    local texCDown01 = nebula.graphics.newTexture("resources/character/charDown01.png")
-    local texCDown02 = nebula.graphics.newTexture("resources/character/charDown02.png")
-    local texCLeft01 = nebula.graphics.newTexture("resources/character/charLeft01.png")
-    local texCLeft02 = nebula.graphics.newTexture("resources/character/charLeft02.png")
-    local texCRight01 = nebula.graphics.newTexture("resources/character/charRight01.png")
-    local texCRight02 = nebula.graphics.newTexture("resources/character/charRight02.png")
-
-    CHARACTER_ENT = nebula.ecs.spawn()
+function Game:loadCamera()
+    CAMERA_ENT = nebula.ecs.spawn()
     nebula.ecs.addComponent(
-        CHARACTER_ENT,
-        Position({x = 336, y = 50}),
-        Speed({x = 0, y = 0}),
-        Animation({
-            curr = {action = ANIMATION_ACTION.IDLE, index = 1},
-            idle = {texCIdle01, texCIdle02},
-            down = {texCDown01, texCDown02},
-            up = {texCUp01, texCUp02},
-            right = {texCRight01, texCRight02},
-            left = {texCLeft01, texCLeft02}
-        }),
-        Sprite({texture = texCIdle01}),
-        CollisionBox({width = texCIdle01.width, height = texCIdle01.height}),
-        Scale({x = SPRITE_SCALE, y = SPRITE_SCALE})
-    )
-
-    local a = nebula.graphics.newTexture("resources/character/testSword.png")
-
-    SWORD_TEST = nebula.ecs.spawn()
-    nebula.ecs.addComponent(
-        SWORD_TEST,
-        Position({x = 336 - 96, y = 50 + 30}),
-        Rotation({value = 0}),
-        Sprite({texture = a}),
-        Scale({x = SPRITE_SCALE, y = SPRITE_SCALE})
+        CAMERA_ENT,
+        Position({x = 0, y = 0}),
+        Speed({x = 0, y = 0, value = 250.0}),
+        Camera({maxOffset = 75, mapOffset = 10})
     )
 end
 
-function Game:updateCharacter(dt)
-    local charSpeed, charAnimation, charSprite = nebula.ecs.getComponent(CHARACTER_ENT, Speed, Animation, Sprite)
-    charSpeed.x = 0
-    charSpeed.y = 0
-    if nebula.keyboard.isKeyPressed('w') then
-        if nebula.keyboard.isKeyPressed("s") then
-            charSpeed.y = 0
-            Game:handleCharacterAnimation(
-                charSprite,
-                charAnimation,
-                dt,
-                ANIMATION_ACTION.IDLE
-            )
-        else
-            charSpeed.y = - DIAGONAL_SPEED
-            if not (nebula.keyboard.isKeyPressed("a") or nebula.keyboard.isKeyPressed("d")) then
-                charSpeed.y = - DEFAULT_SPEED
-                Game:handleCharacterAnimation(
-                    charSprite,
-                    charAnimation,
-                    dt,
-                    ANIMATION_ACTION.UP
-                )
-            end
-        end
+function Game:updateCamera()
+    local charPos = nebula.ecs.getComponent(CHARACTER_ENT, Position)
+    local camSpeed, camPos, camComp = nebula.ecs.getComponent(CAMERA_ENT, Speed, Position, Camera)
+    camSpeed.x = 0
+
+    local charCenterX = charPos.x + (40 * SPRITE_SCALE)
+    local camCenterX = camPos.x + WINDOW_WIDTH/2
+    --local camCenterY = camPos.y + WINDOW_HEIGHT/2
+
+    local currOffset = charCenterX - camCenterX
+
+    local cameraLeftBound = camPos.x
+    local camertaRightBound = camPos.x + WINDOW_WIDTH
+
+    local mapLeftBound = 0
+    local mapRightBound = MAP_BOUNDS.x
+
+    if (currOffset >= camComp.maxOffset and camertaRightBound <= mapRightBound + camComp.mapOffset) then
+        camSpeed.x = camSpeed.value
     end
-    if nebula.keyboard.isKeyPressed("s") then
-        if nebula.keyboard.isKeyPressed("w") then
-            charSpeed.y = 0
-            Game:handleCharacterAnimation(
-                charSprite,
-                charAnimation,
-                dt,
-                ANIMATION_ACTION.IDLE
-            )
-        else
-            charSpeed.y = DIAGONAL_SPEED
-            if not (nebula.keyboard.isKeyPressed("a") or nebula.keyboard.isKeyPressed("d")) then
-                charSpeed.y = DEFAULT_SPEED
-                Game:handleCharacterAnimation(
-                    charSprite,
-                    charAnimation,
-                    dt,
-                    ANIMATION_ACTION.DOWN
-                )
-            end
-        end
-    end
-    if nebula.keyboard.isKeyPressed("a") then
-        if nebula.keyboard.isKeyPressed("d") then
-            charSpeed.x = 0
-            Game:handleCharacterAnimation(
-                charSprite,
-                charAnimation,
-                dt,
-                ANIMATION_ACTION.IDLE
-            )
-        else
-            charSpeed.x = - DIAGONAL_SPEED
-            if not (nebula.keyboard.isKeyPressed("w") or nebula.keyboard.isKeyPressed("s")) then
-                charSpeed.x = - DEFAULT_SPEED
-            end
-            Game:handleCharacterAnimation(
-                charSprite,
-                charAnimation,
-                dt,
-                ANIMATION_ACTION.LEFT
-            )
-        end
-    end
-    if nebula.keyboard.isKeyPressed("d") then
-        if nebula.keyboard.isKeyPressed("a") then
-            charSpeed.x = 0
-            Game:handleCharacterAnimation(
-                charSprite,
-                charAnimation,
-                dt,
-                ANIMATION_ACTION.IDLE
-            )
-        else
-            charSpeed.x = DIAGONAL_SPEED
-            if not (nebula.keyboard.isKeyPressed("w") or nebula.keyboard.isKeyPressed("s")) then
-                charSpeed.x = DEFAULT_SPEED
-            end
-            Game:handleCharacterAnimation(
-                charSprite,
-                charAnimation,
-                dt,
-                ANIMATION_ACTION.RIGHT
-            )
-        end
-    end
-    if not (nebula.keyboard.isKeyPressed("d") or nebula.keyboard.isKeyPressed("a") or nebula.keyboard.isKeyPressed("w") or nebula.keyboard.isKeyPressed("s")) then
-        Game:handleCharacterAnimation(
-            charSprite,
-            charAnimation,
-            dt,
-            ANIMATION_ACTION.IDLE
-        )
+
+    if (currOffset <= - camComp.maxOffset and cameraLeftBound >= mapLeftBound - camComp.mapOffset) then
+        camSpeed.x = - camSpeed.value
     end
 end
 
-function Game:handleCharacterAnimation(charSprite, charAnimation, dt, targetAnimation)
-    local interval = CHARACTER_MOVE_ANIMATION_INTERVAL
-    local spriteSheet = {}
-    if targetAnimation == ANIMATION_ACTION.IDLE then
-        spriteSheet = charAnimation.idle
-        interval = CHARACTER_IDLE_ANIMATION_INTERVAL
-    elseif targetAnimation == ANIMATION_ACTION.DOWN then
-        spriteSheet = charAnimation.down
-    elseif targetAnimation == ANIMATION_ACTION.UP then
-        spriteSheet = charAnimation.up
-    elseif targetAnimation == ANIMATION_ACTION.LEFT then
-        spriteSheet = charAnimation.left
-    elseif targetAnimation == ANIMATION_ACTION.RIGHT then
-        spriteSheet = charAnimation.right
-    end
-
-    if charAnimation.curr.action ~= targetAnimation then
-        charAnimation.timer = 0
-        charAnimation.curr.index = 1
-        charAnimation.curr.action = targetAnimation
-        charSprite.texture = spriteSheet[1]
-    else
-        charAnimation.timer = charAnimation.timer + dt
-
-        if charAnimation.timer >= interval then
-            charAnimation.timer = 0
-            local count = TableLength(spriteSheet)
-            charAnimation.curr.index = (charAnimation.curr.index + 1)%(count + 1)
-
-            if charAnimation.curr.index == 0 then
-                charAnimation.curr.index = 1
-            end
-        end
-
-        charSprite.texture = spriteSheet[charAnimation.curr.index]
-    end
-end
 
 return Game

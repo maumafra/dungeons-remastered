@@ -10,11 +10,9 @@ local MenuSelecion = {
     ACHIEVEMENTS = 1,
     QUIT = 2
 }
-local SelectionPos = {
-    START = {x = WINDOW_WIDTH/2 - 80, y = 312},
-    ACHIEVEMENTS = {x = WINDOW_WIDTH/2 - 150, y = 402},
-    QUIT = {x = WINDOW_WIDTH/2 - 60, y = 492}
-}
+
+local selectionXOffset = -30
+local optionYOffset = 90
 
 local menuOptionsCount = 3
 local MenuText = {
@@ -31,6 +29,13 @@ local MenuColors = {
     YELLOW = {r = 1.0, g = 0.78, b = 0.0, a = 1.0},
     RED = {r = 1.0, g = 0.0, b = 0.0, a = 1.0}
 }
+
+local function getCenterPosX(text, offset)
+    if not offset then
+        offset = 0
+    end
+    return WINDOW_WIDTH/2 - currFont:getWidth(text)/2 + offset
+end
 
 function Menu:createText(text, posX, color)
     local ent = nebula.ecs.spawn()
@@ -67,13 +72,14 @@ function Menu:setup()
     Menu:switchFont(GameFont120)
     -- Creating multiple texts to create a "BOLD" effect, as we dont support it
     -- right now on nebula engine
-    shadowText[1] = Menu:createShadowText(MenuText.TITLE, WINDOW_WIDTH/4 - 20 + 3, MenuColors.RED)
-    shadowText[2] = Menu:createShadowText(MenuText.TITLE, WINDOW_WIDTH/4 - 20 + 4, MenuColors.RED)
-    shadowText[3] = Menu:createShadowText(MenuText.TITLE, WINDOW_WIDTH/4 - 20 + 5, MenuColors.RED)
+    local titleCenterX = getCenterPosX(MenuText.TITLE)
+    shadowText[1] = Menu:createShadowText(MenuText.TITLE, titleCenterX + 3, MenuColors.RED)
+    shadowText[2] = Menu:createShadowText(MenuText.TITLE, titleCenterX + 4, MenuColors.RED)
+    shadowText[3] = Menu:createShadowText(MenuText.TITLE, titleCenterX + 5, MenuColors.RED)
 
-    Menu:createText(MenuText.TITLE, WINDOW_WIDTH/4 - 20, MenuColors.YELLOW)
-    Menu:createText(MenuText.TITLE, WINDOW_WIDTH/4 - 20 + 1, MenuColors.YELLOW)
-    Menu:createText(MenuText.TITLE, WINDOW_WIDTH/4 - 20 + 2, MenuColors.YELLOW)
+    Menu:createText(MenuText.TITLE, titleCenterX, MenuColors.YELLOW)
+    Menu:createText(MenuText.TITLE, titleCenterX + 1, MenuColors.YELLOW)
+    Menu:createText(MenuText.TITLE, titleCenterX + 2, MenuColors.YELLOW)
 
     Menu:row(120)
 
@@ -81,7 +87,7 @@ function Menu:setup()
     local sacrificeMark = nebula.ecs.spawn()
     nebula.ecs.addComponent(
         sacrificeMark,
-        Position({x = WINDOW_WIDTH/2 - (texSacrificeMark.width/2 * SPRITE_SCALE), y = posY}),
+        Position({x = WINDOW_WIDTH/2 - (texSacrificeMark:getWidth()/2 * SPRITE_SCALE), y = posY}),
         Sprite({texture = texSacrificeMark}),
         Scale({x = SPRITE_SCALE, y = SPRITE_SCALE}),
         MenuFlag({})
@@ -90,12 +96,12 @@ function Menu:setup()
     Menu:row(176) -- 96 (sprite size) + 80
     Menu:switchFont(GameFont50)
 
-    selectonEnt = Menu:createText(MenuText.SELECTION, SelectionPos.START.x, MenuColors.YELLOW)
-    Menu:createText(MenuText.START, WINDOW_WIDTH/2 - 50, MenuColors.YELLOW)
-    Menu:row(90)
-    Menu:createText(MenuText.ACHIEVEMENTS, WINDOW_WIDTH/2 - 120, MenuColors.YELLOW)
-    Menu:row(90)
-    Menu:createText(MenuText.QUIT, WINDOW_WIDTH/2 - 30, MenuColors.YELLOW)
+    selectonEnt = Menu:createText(MenuText.SELECTION, getCenterPosX(MenuText.START, selectionXOffset), MenuColors.YELLOW)
+    Menu:createText(MenuText.START, getCenterPosX(MenuText.START), MenuColors.YELLOW)
+    Menu:row(optionYOffset)
+    Menu:createText(MenuText.ACHIEVEMENTS, getCenterPosX(MenuText.ACHIEVEMENTS), MenuColors.YELLOW)
+    Menu:row(optionYOffset)
+    Menu:createText(MenuText.QUIT, getCenterPosX(MenuText.QUIT), MenuColors.YELLOW)
 end
 
 function Menu:update()
@@ -119,6 +125,8 @@ function Menu:update()
         if currSelection == MenuSelecion.START then
             GameManager:changeState(GAME_STATE.RUNNING)
             GameManager:changeScene(GAME_SCENE.GAME)
+            nebula.graphics.setLight(true)
+            nebula.graphics.setAmbientLight(0.3)
         elseif currSelection == MenuSelecion.ACHIEVEMENTS then
             GameManager:changeScene(GAME_SCENE.ACHIEVEMENTS)
         elseif currSelection == MenuSelecion.QUIT then
@@ -131,15 +139,16 @@ function Menu:update()
     end
 
     local posComponent = nebula.ecs.getComponent(selectonEnt, Position)
+    local firstMenuOptionY = 312
     if currSelection == MenuSelecion.START then
-        posComponent.x = SelectionPos.START.x
-        posComponent.y = SelectionPos.START.y
+        posComponent.x = getCenterPosX(MenuText.START, selectionXOffset)
+        posComponent.y = firstMenuOptionY
     elseif currSelection == MenuSelecion.ACHIEVEMENTS then
-        posComponent.x = SelectionPos.ACHIEVEMENTS.x
-        posComponent.y = SelectionPos.ACHIEVEMENTS.y
+        posComponent.x = getCenterPosX(MenuText.ACHIEVEMENTS, selectionXOffset)
+        posComponent.y = firstMenuOptionY + optionYOffset
     elseif currSelection == MenuSelecion.QUIT then
-        posComponent.x = SelectionPos.QUIT.x
-        posComponent.y = SelectionPos.QUIT.y
+        posComponent.x = getCenterPosX(MenuText.QUIT, selectionXOffset)
+        posComponent.y = firstMenuOptionY + (2 * optionYOffset)
     end
 end
 

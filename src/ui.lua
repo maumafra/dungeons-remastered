@@ -12,9 +12,13 @@ function Ui:setup()
     )
 end
 
-function Ui:update()
+function Ui:update(dt)
     local textComponent = nebula.ecs.getComponent(FPS_ENT, Text)
     textComponent.value = tostring(nebula.time.getFPS())
+
+    local camPos = nebula.ecs.getComponent(CAMERA_ENT, Position)
+    local fpsPos = nebula.ecs.getComponent(FPS_ENT, Position)
+    fpsPos.x = 20 + camPos.x
 
     if nebula.keyboard.isKeyReleased('tab') then
         FPS_SHOW = not FPS_SHOW

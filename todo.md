@@ -7,4 +7,6 @@
 6. [ ] Ataque
 7. [ ] Movimento de Câmera
 8. [ ] Achievements
- 
+9. [ ] Inverter ordem de animacao de andar para comecar com o sprite estendendo a perna
+10. [ ] Lightning
+11. [ ] Idle on Right, Left, Up
